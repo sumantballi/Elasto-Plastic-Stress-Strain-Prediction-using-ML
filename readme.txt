@@ -1,31 +1,132 @@
-This folder contains the original data (fea_database), the preprocessed data (preprocessed) when using the script preprocess.py, as well as the FE model that was used to create the data (fea_model). The preprocessed data folder is most relevant when working on the project.
+# Elasto-Plastic Stress–Strain Prediction Using Machine Learning
 
-The following describes the data in the fea_database folder:
+The aim of this project is to investigate whether a machine learning model can be trained to predict stresses and strains in a loaded structure and to evaluate how well the model generalizes to variations in geometry, load distribution, and mesh density. :contentReference[oaicite:0]{index=0}
 
-This database contains results from FE analyses of a plate with a hole.
+## Repository Structure
 
-The following apply for all cases:
-Plated dimensions: 100 mm wide, 200 mm high, 2 mm thick, 20 mm diameter of hole.
-Load is applied as nodal forces in the vertical direction (y-direction) on the upper and bottom edge.
-Symmetry boundary conditions are applied on the horizontal symmetry line.
-The mesh consists of linear quadrilateral elements (QUAD4).
+- `fea_database/` – Original finite element (FE) simulation results for a plate with a hole.
+- `preprocessed/` – Preprocessed data generated using `preprocess.py`. This is the main dataset used for training and evaluating the ML models.
+- `fea_model/` – The FE model used to generate the database (Ansys Workbench 2022 R2).
+- `preprocess.py` – Script to convert raw FE output into a machine-learning-ready format. :contentReference[oaicite:1]{index=1}
+- `Task_1 (2).ipynb`, `Task_2 (1).ipynb` – Notebooks for exploratory tasks and intermediate experiments.
+- `strain_stress_prediction.ipynb` – Main notebook for training and evaluating stress–strain prediction models. :contentReference[oaicite:2]{index=2}
+- `stress-strain-prediction (2).pdf` – Report/summary of the project (slides or written report).
 
-The following apply to specific cases:
-1) Baseline: The hole is positioned in the center of the plate (50 mm from the left edge). Load is applied as uniformly distributed. The mesh density is high (936 elements, 1014 nodes). Contains 1000 FE simulations of different applied loads from 70 N to 70 kN.
-2) Linear load: The load is not uniform; it increases linearly (starting at zero) from left to right. Otherwise as the baseline case. Contains 500 FE simulations of different applied loads from 70 N to 70 kN.
-3) Off center 1: The center of the hole is positioned 40 mm from the left edge. Otherwise as the baseline case. Contains 500 FE simulations of different applied loads from 70 N to 70 kN.
-4) Off center 2: The center of the hole is positioned 30 mm from the left edge. Otherwise as the baseline case. Contains 500 FE simulations of different applied loads from 70 N to 70 kN.
-5) Off center 3: The center of the hole is positioned 20 mm from the left edge. Otherwise as the baseline case. Contains 500 FE simulations of different applied loads from 70 N to 70 kN.
-6) Coarse mesh: Same as the baseline case but with a coarser mesh (352 elements, 402 nodes). Contains 500 FE simulations of different applied loads from 70 N to 70 kN.
+> **Note:** Folder names such as `fea_database/`, `preprocessed/`, and `fea_model/` refer to the dataset package accompanying this repository.
 
-The data files should be interpreted the following way:
-The files contains two blocks: INPUT and OUTPUT
-INPUT: Gives the x- and y-coordinates of the nodes (X and Y) where nodal forces are applied and their corresponding force components in N in the x- and y-direction (FX and FY).
-OUTPUT: Gives the results from the FE analysis at each node. For each node is given: x- and y-coordinates (X and Y), equivalent total strain in mm/mm (EPTOeqv), equivalent elastic strain in mm/mm (EPELeqv), equivalent plastic strain in mm/mm (EPPLeqv) and equivalent (von Mises) stress in MPa (Seqv).
+---
 
-An FE model is also supplied in case you would like to generate additional data. The model is generated in Ansys Workbench 2022 R2 and can be opened in that or later versions.
-In its current form, loads are applied using an APDL script. It works like this: the x-component of the total applied force in N is given as ARG1 and the y-component of the total applied force in N is given as ARG2. The total applied force is the integral over the line load (i.e. the total applied force you give will be recalculated into a corresponding line load in N/mm). The given y-component (ARG2) will be applied positive on the upper edge and negative on the bottom edge (i.e. symmetrically) and the x-component (ARG1) will be applied positive on the upper edge and negative on the bottom edge (i.e. antisymmetrically).
-An APDL script under "Solution" writes data to file. The resulting file is called "fea_results.txt" and ends up in the current working directory; typically something like ".../dp0/SYS-#/MECH/fea_results.txt" where # = 1, 2, 3, ... is the internal numbering of the analysis system.
+## Finite Element Database
 
-Q how to improve prediction, only epoch changed. is there a systematic practical method?
-Q Per sample, the values are not equally distributed: add weights for loss calculation or sample in different sizes. How to implement any of the methods
+The `fea_database` folder contains FE results for a 2D plate with a circular hole under various loading and geometric configurations.
+
+### Common Model Setup
+
+The following settings are common to all cases:
+
+- Plate dimensions:
+  - Width: 100 mm  
+  - Height: 200 mm  
+  - Thickness: 2 mm  
+  - Hole diameter: 20 mm
+- Loading:
+  - Nodal forces applied in the vertical (y) direction on the upper and bottom edges.
+- Boundary conditions:
+  - Symmetry boundary conditions along the horizontal symmetry line.
+- Mesh:
+  - Linear quadrilateral elements (QUAD4).
+
+### Load and Geometry Cases
+
+1. **Baseline**
+   - Hole centered: 50 mm from the left edge.
+   - Load: Uniformly distributed along the edge.
+   - Mesh: Fine mesh (936 elements, 1014 nodes).
+   - Simulations: 1000 FE analyses with applied loads ranging from 70 N to 70 kN.
+
+2. **Linear Load**
+   - Geometry: Same as Baseline.
+   - Load: Non-uniform; linearly increasing from left to right (starting from zero).
+   - Simulations: 500 FE analyses with applied loads from 70 N to 70 kN.
+
+3. **Off-Center 1**
+   - Hole center: 40 mm from the left edge.
+   - Other settings: As in Baseline.
+   - Simulations: 500 FE analyses (70 N to 70 kN).
+
+4. **Off-Center 2**
+   - Hole center: 30 mm from the left edge.
+   - Other settings: As in Baseline.
+   - Simulations: 500 FE analyses (70 N to 70 kN).
+
+5. **Off-Center 3**
+   - Hole center: 20 mm from the left edge.
+   - Other settings: As in Baseline.
+   - Simulations: 500 FE analyses (70 N to 70 kN).
+
+6. **Coarse Mesh**
+   - Geometry and loading: Same as Baseline.
+   - Mesh: Coarser mesh (352 elements, 402 nodes).
+   - Simulations: 500 FE analyses (70 N to 70 kN).
+
+---
+
+## Data Format
+
+Each FE result file contains two blocks: `INPUT` and `OUTPUT`.
+
+### INPUT Block
+
+For each node where forces are applied:
+
+- `X`, `Y` – Nodal coordinates (mm).
+- `FX`, `FY` – Force components in the x and y directions (N).
+
+This block describes the applied loading state for the simulation.
+
+### OUTPUT Block
+
+For each node in the FE model:
+
+- `X`, `Y` – Nodal coordinates (mm).
+- `EPTOeqv` – Equivalent total strain (mm/mm).
+- `EPELeqv` – Equivalent elastic strain (mm/mm).
+- `EPPLeqv` – Equivalent plastic strain (mm/mm).
+- `Seqv` – Equivalent (von Mises) stress (MPa).
+
+These quantities are the targets for the machine learning models.
+
+---
+
+## FE Model and Data Generation
+
+An FE model is provided in the `fea_model` folder for generating additional data:
+
+- Software: Ansys Workbench 2022 R2 (or later).
+- Loading is applied using an APDL script:
+  - `ARG1` – x-component of the total applied force (N).
+  - `ARG2` – y-component of the total applied force (N).
+- The total applied force is interpreted as the line integral over the edge, and is internally converted to a line load (N/mm).
+- Application of loads:
+  - `ARG2` (y-force) is applied:
+    - Positive on the upper edge.
+    - Negative on the bottom edge (symmetric loading).
+  - `ARG1` (x-force) is applied:
+    - Positive on the upper edge.
+    - Negative on the bottom edge (antisymmetric loading).
+
+An APDL script under the **Solution** branch writes the FE results to a file:
+
+- Output file name: `fea_results.txt`
+- Typical file path:  
+  `.../dp0/SYS-#/MECH/fea_results.txt`  
+  where `# = 1, 2, 3, ...` is the internal system index within Ansys.
+
+---
+
+## Preprocessing
+
+Use `preprocess.py` to convert raw FE output files into preprocessed datasets suitable for ML:
+
+```bash
+python preprocess.py
