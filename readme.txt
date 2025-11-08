@@ -1,132 +1,201 @@
-# Elasto-Plastic Stress–Strain Prediction Using Machine Learning
+[![Release](https://img.shields.io/github/v/release/sumantballi/Elasto-Plastic-Stress-Strain-Prediction-using-ML?sort=semver)](https://github.com/sumantballi/Elasto-Plastic-Stress-Strain-Prediction-using-ML/releases)
 
-The aim of this project is to investigate whether a machine learning model can be trained to predict stresses and strains in a loaded structure and to evaluate how well the model generalizes to variations in geometry, load distribution, and mesh density. :contentReference[oaicite:0]{index=0}
+## Introduction
 
-## Repository Structure
+This mini-project explores if a data-driven model can learn to predict stresses and strains in a loaded structure and how well it generalizes to variations in geometry, load distribution, and mesh density.
 
-- `fea_database/` – Original finite element (FE) simulation results for a plate with a hole.
-- `preprocessed/` – Preprocessed data generated using `preprocess.py`. This is the main dataset used for training and evaluating the ML models.
-- `fea_model/` – The FE model used to generate the database (Ansys Workbench 2022 R2).
-- `preprocess.py` – Script to convert raw FE output into a machine-learning-ready format. :contentReference[oaicite:1]{index=1}
-- `Task_1 (2).ipynb`, `Task_2 (1).ipynb` – Notebooks for exploratory tasks and intermediate experiments.
-- `strain_stress_prediction.ipynb` – Main notebook for training and evaluating stress–strain prediction models. :contentReference[oaicite:2]{index=2}
-- `stress-strain-prediction (2).pdf` – Report/summary of the project (slides or written report).
+The setup is intentionally simple: a 2D plate with a circular hole, several FE variants (load patterns, hole location, mesh density), and a neural-network–style surrogate mapping loads and coordinates to nodal stress/strain measures.
 
-> **Note:** Folder names such as `fea_database/`, `preprocessed/`, and `fea_model/` refer to the dataset package accompanying this repository.
+No new FE modelling is the focus here; the project is about **using** a curated FE database to test how far a relatively simple ML model can go.
 
----
+## What to look for
 
-## Finite Element Database
+- Plate-with-hole benchmark with:
+  - Baseline vs off-centred holes.
+  - Uniform vs linearly varying edge loads.
+  - Fine vs coarse meshes.
+- Node-wise ML predictions for:
+  - Equivalent total strain `EPTOeqv`.
+  - Equivalent elastic strain `EPELeqv`.
+  - Equivalent plastic strain `EPPLeqv`.
+  - Equivalent von Mises stress `Seqv`.
+- Generalization checks:
+  - Train on some cases, test on unseen load patterns / hole positions / mesh density.
+- Typical questions:
+  - Does the model capture stress concentration around the hole?
+  - How sensitive is it to data imbalance (many “low-stress” points vs few “hot-spot” points)?
+  - What happens when we change training strategy (epochs, weighting, sampling)?
 
-The `fea_database` folder contains FE results for a 2D plate with a circular hole under various loading and geometric configurations.
+## Folder map
 
-### Common Model Setup
+> The project assumes access to an FE dataset with the following structure:
 
-The following settings are common to all cases:
+- `fea_database/` – Original FE simulations of a plate with a hole.
+- `preprocessed/` – Data after running `preprocess.py` (ML-ready; main working folder).
+- `fea_model/` – FE model used to generate the database (Ansys Workbench 2022 R2).
 
-- Plate dimensions:
+In this GitHub repo you currently find:
+
+- `preprocess.py` – Script to convert FE text output into structured, ML-ready data.
+- `Task_1 (2).ipynb` – First task / exploratory notebook on the dataset.
+- `Task_2 (1).ipynb` – Follow-up analyses / experiments.
+- `strain_stress_prediction.ipynb` – Main notebook for training and evaluating the surrogate.
+- `strain_stress_prediction (1).ipynb` – Variant/backup of the main notebook.
+- `stress-strain-prediction (2).pdf` – Slides/report summarizing the study.
+
+`fea_database/`, `preprocessed/`, and `fea_model/` are part of the accompanying dataset folder (place them next to the notebooks when running the project).
+
+## FE dataset (plate with a hole)
+
+The FE database contains results from analyses of a 2D plate with a circular hole:
+
+- Plate:
   - Width: 100 mm  
   - Height: 200 mm  
   - Thickness: 2 mm  
   - Hole diameter: 20 mm
 - Loading:
-  - Nodal forces applied in the vertical (y) direction on the upper and bottom edges.
+  - Nodal forces applied in the vertical direction (y-direction) on the upper and bottom edges.
 - Boundary conditions:
-  - Symmetry boundary conditions along the horizontal symmetry line.
-- Mesh:
+  - Symmetry along the horizontal symmetry line.
+- Elements:
   - Linear quadrilateral elements (QUAD4).
 
-### Load and Geometry Cases
+### Cases
 
 1. **Baseline**
-   - Hole centered: 50 mm from the left edge.
-   - Load: Uniformly distributed along the edge.
-   - Mesh: Fine mesh (936 elements, 1014 nodes).
-   - Simulations: 1000 FE analyses with applied loads ranging from 70 N to 70 kN.
+   - Hole centred: 50 mm from the left edge.
+   - Load: uniformly distributed along top/bottom edges.
+   - Mesh: fine (936 elements, 1014 nodes).
+   - 1000 simulations, loads from 70 N to 70 kN.
 
-2. **Linear Load**
-   - Geometry: Same as Baseline.
-   - Load: Non-uniform; linearly increasing from left to right (starting from zero).
-   - Simulations: 500 FE analyses with applied loads from 70 N to 70 kN.
+2. **Linear load**
+   - Same geometry as baseline.
+   - Load: non-uniform; linearly increasing from left to right (starting at zero).
+   - 500 simulations, loads from 70 N to 70 kN.
 
-3. **Off-Center 1**
-   - Hole center: 40 mm from the left edge.
-   - Other settings: As in Baseline.
-   - Simulations: 500 FE analyses (70 N to 70 kN).
+3. **Off center 1**
+   - Hole center: 40 mm from left edge.
+   - Other settings: as baseline.
+   - 500 simulations, loads from 70 N to 70 kN.
 
-4. **Off-Center 2**
-   - Hole center: 30 mm from the left edge.
-   - Other settings: As in Baseline.
-   - Simulations: 500 FE analyses (70 N to 70 kN).
+4. **Off center 2**
+   - Hole center: 30 mm from left edge.
+   - Other settings: as baseline.
+   - 500 simulations, loads from 70 N to 70 kN.
 
-5. **Off-Center 3**
-   - Hole center: 20 mm from the left edge.
-   - Other settings: As in Baseline.
-   - Simulations: 500 FE analyses (70 N to 70 kN).
+5. **Off center 3**
+   - Hole center: 20 mm from left edge.
+   - Other settings: as baseline.
+   - 500 simulations, loads from 70 N to 70 kN.
 
-6. **Coarse Mesh**
-   - Geometry and loading: Same as Baseline.
-   - Mesh: Coarser mesh (352 elements, 402 nodes).
-   - Simulations: 500 FE analyses (70 N to 70 kN).
+6. **Coarse mesh**
+   - Same geometry/load as baseline.
+   - Coarser mesh: 352 elements, 402 nodes.
+   - 500 simulations, loads from 70 N to 70 kN.
 
----
+## Data blocks: INPUT vs OUTPUT
 
-## Data Format
+Each FE result file has two blocks: `INPUT` and `OUTPUT`.
 
-Each FE result file contains two blocks: `INPUT` and `OUTPUT`.
+### INPUT block
 
-### INPUT Block
+Nodal loading:
 
-For each node where forces are applied:
+- `X`, `Y` – coordinates of nodes where forces are applied (mm).
+- `FX`, `FY` – force components in x- and y-directions (N).
 
-- `X`, `Y` – Nodal coordinates (mm).
-- `FX`, `FY` – Force components in the x and y directions (N).
+This defines the load state used for that simulation.
 
-This block describes the applied loading state for the simulation.
+### OUTPUT block
 
-### OUTPUT Block
+Nodal responses:
 
-For each node in the FE model:
+- `X`, `Y` – nodal coordinates (mm).
+- `EPTOeqv` – equivalent total strain (mm/mm).
+- `EPELeqv` – equivalent elastic strain (mm/mm).
+- `EPPLeqv` – equivalent plastic strain (mm/mm).
+- `Seqv` – equivalent von Mises stress (MPa).
 
-- `X`, `Y` – Nodal coordinates (mm).
-- `EPTOeqv` – Equivalent total strain (mm/mm).
-- `EPELeqv` – Equivalent elastic strain (mm/mm).
-- `EPPLeqv` – Equivalent plastic strain (mm/mm).
-- `Seqv` – Equivalent (von Mises) stress (MPa).
+These are the targets for the ML model.
 
-These quantities are the targets for the machine learning models.
+## FE model & data generation
 
----
+A reference FE model is provided in `fea_model/`:
 
-## FE Model and Data Generation
+- Built in Ansys Workbench 2022 R2 (openable in that or later versions).
+- Loads are applied via APDL:
+  - `ARG1` – total x-component of applied force (N).
+  - `ARG2` – total y-component of applied force (N).
+- The total forces are converted to line loads (N/mm) over the edges:
+  - `ARG2` (y-force): positive on upper edge, negative on bottom edge (symmetric).
+  - `ARG1` (x-force): positive on upper edge, negative on bottom edge (antisymmetric).
 
-An FE model is provided in the `fea_model` folder for generating additional data:
+An APDL script under **Solution** writes results to:
 
-- Software: Ansys Workbench 2022 R2 (or later).
-- Loading is applied using an APDL script:
-  - `ARG1` – x-component of the total applied force (N).
-  - `ARG2` – y-component of the total applied force (N).
-- The total applied force is interpreted as the line integral over the edge, and is internally converted to a line load (N/mm).
-- Application of loads:
-  - `ARG2` (y-force) is applied:
-    - Positive on the upper edge.
-    - Negative on the bottom edge (symmetric loading).
-  - `ARG1` (x-force) is applied:
-    - Positive on the upper edge.
-    - Negative on the bottom edge (antisymmetric loading).
+- `fea_results.txt` (text format).
+- Typical path: `.../dp0/SYS-#/MECH/fea_results.txt` where `# = 1, 2, 3, ...` is the internal system ID.
 
-An APDL script under the **Solution** branch writes the FE results to a file:
+You can regenerate or extend the database by running additional load cases with this model.
 
-- Output file name: `fea_results.txt`
-- Typical file path:  
-  `.../dp0/SYS-#/MECH/fea_results.txt`  
-  where `# = 1, 2, 3, ...` is the internal system index within Ansys.
+## Key Methods & Model
 
----
+At a high level, the surrogate learns a mapping of the form
 
-## Preprocessing
+\[
+(X, Y, FX, FY, \text{case features}) \;\longrightarrow\; 
+\big[\mathrm{EPTOeqv}, \mathrm{EPELeqv}, \mathrm{EPPLeqv}, \mathrm{Seqv}\big]
+\]
 
-Use `preprocess.py` to convert raw FE output files into preprocessed datasets suitable for ML:
+- Inputs:
+  - Node coordinates and applied forces; optionally case tags (baseline / linear load / off-center / coarse).
+- Outputs:
+  - Node-wise equivalent strains and stress from the FE analysis.
+- Typical model:
+  - Fully connected neural network / regression model.
+  - Multi-output regression (all four quantities predicted jointly).
+- Training:
+  - Use `preprocess.py` to build a single consolidated dataset.
+  - Split into train / validation / test (e.g. by cases or by simulations).
+  - Train and evaluate in `strain_stress_prediction.ipynb`.
 
-```bash
-python preprocess.py
+The focus is on:
+
+- Generalization across **physics-related variations** (geometry, loading, mesh).
+- Handling **imbalanced data** (many low-stress nodes vs few high-gradient nodes around the hole).
+- Comparing different training strategies (plain MSE vs weighted losses, varying epochs, etc.).
+
+## Results (quick look)
+
+For quick insight:
+
+- Open `strain_stress_prediction.ipynb` and:
+  - Plot predicted vs FE `Seqv` and `EPTOeqv` across the plate.
+  - Compare error distributions in high-stress vs low-stress regions.
+- See `stress-strain-prediction (2).pdf` for:
+  - Project motivation and setup.
+  - Sample contour plots from FE vs ML.
+  - Observations on generalization and limitations.
+
+(Exact figures depend on the current state of the notebooks; re-run them to regenerate plots.)
+
+## Future-Scope
+
+- **Better training strategies**
+  - Systematic hyperparameter tuning (learning rate, depth, width, regularization).
+  - Sample weighting or resampling for underrepresented high-stress regions.
+- **Richer model classes**
+  - Graph/mesh-aware models (GNNs, message-passing on FE nodes/elements).
+  - Physics-informed neural networks (PINNs) with equilibrium/compatibility regularization.
+- **Extended datasets**
+  - Additional load paths (biaxial, shear).
+  - Different geometries (multiple holes, notches, fillets).
+  - 3D extensions and elasto-plastic hardening laws.
+- **Solver integration**
+  - Use the trained surrogate as a fast proxy in optimization or uncertainty studies.
+
+## About
+
+The aim of this project is to figure out if a model can be learned to predict stresses and strains in a loaded structure and to see if the model can generalize in terms of variation in geometry, load distribution, and mesh density.
+
+Suggestions, issues, or ideas for extensions are welcome via GitHub Issues.
